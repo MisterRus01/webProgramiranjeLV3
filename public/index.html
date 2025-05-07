@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Primjer HTML5 stranice s vremenskim podacima i CSV prikazom.">
+    <link rel="stylesheet" href="style.css">
+    <title>Primjer HTML5 stranice</title>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+</head>
+<body>
+    <header>
+        <h1>Dobrodošli na moju web stranicu</h1>
+        <nav aria-label="Main navigation">
+            <ul class="nav-menu">
+                <li><a href="index.html">Početna</a></li>
+                <li><a href="grafikon.html">Grafikon</a></li>
+                <li><a href="slike.html">Galerija</a></li>
+            </ul>
+        </nav>
+    </header>
+    <section id="basket-section" style="display: none;">
+      <h2>Košarica</h2>
+      <table id="basketTable"></table>
+      <button id="confirmAllBtn" onclick="confirmAllItems()">Potvrdi sve vremenske prilike</button>
+      <p id="basketTotal"></p>
+    </section>
+    <section style="display: flex; gap: 30px; justify-content: space-between; flex-wrap: wrap;">
+        <figure class="weather-table-wrapper" style="flex: 1 1 60%;">
+          <h2>Vremenski Podaci</h2>
+          <div style="margin-bottom: 20px;">
+            <label for="seasonFilter">Sezona:</label>
+            <select id="seasonFilter">
+                <option value="">Sve</option>
+                <option value="Spring">Proljeće</option>
+                <option value="Summer">Ljeto</option>
+                <option value="Autumn">Jesen</option>
+                <option value="Winter">Zima</option>
+            </select>
+        
+              <label for="locationFilter" style="margin-left: 20px;">Lokacija:</label>
+              <select id="locationFilter">
+                  <option value="">Sve</option>
+              </select>
+              <label for="tempRange" style="margin-left: 20px;">Min. temperatura (°C):</label>
+              <input type="range" id="tempRange" min="0" max="50" value="0" step="1">
+              <span id="tempValue">0</span>
+          </div>
+            <figcaption>Tablica učitana iz temperature.csv</figcaption>
+        </figure>
+        <!--Slika desno od tablice-->
+        <aside style="flex: 0 0 200px;">
+            <h3 style="text-align: center;">Ilustracija</h3>
+            <img src="sun.jpg" alt="Vremenska ilustracija"
+                 style="width: 600px; height: 300px; object-fit: cover; border-radius: 10px;">
+        </aside>
+    </section>
+
+    <article>
+        <h2>Najnovije vijesti</h2>
+        <p>Ovdje se nalazi članak s važnim informacijama.</p>
+    </article>
+    <section id="csv-table-section">
+        <h2>Automatski učitana vremenska tablica</h2>
+        <div id="csv-table-container"></div>
+    </section>
+
+    <footer>
+        <p>&copy; 2025. Web Programiranje. Sva prava pridržana.</p>
+    </footer>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        let originalRows = [];
+        let headers = [];
+        let basket = [];
+      
+        // Elementi za filtriranje
+        const seasonFilter = document.getElementById("seasonFilter");
+        const locationFilter = document.getElementById("locationFilter");
+        const tempRange = document.getElementById("tempRange");
+        const tempValue = document.getElementById("tempValue");
+      
+        // Košarica
+        const basketTable = document.getElementById("basketTable");
+        const basketTotal = document.getElementById("basketTotal");
+        const basketSection = document.getElementById("basket-section"); // Sekcija košarice
+      
+        // Dodaj event listenere
+        seasonFilter.addEventListener("change", renderTable);
+        locationFilter.addEventListener("change", renderTable);
+        tempRange.addEventListener("input", () => {
+            tempValue.textContent = tempRange.value;
+            renderTable();
+        });
+      
+        fetch("weather_Small.csv")
+            .then(response => {
+                if (!response.ok) throw new Error("Ne mogu dohvatiti CSV datoteku.");
+                return response.text();
+            })
+            .then(csvText => {
+                const parsed = Papa.parse(csvText, {
+                    header: true,
+                    skipEmptyLines: true,
+                    trimHeaders: true
+                });
+      
+                headers = parsed.meta.fields;
+                originalRows = parsed.data;
+      
+                populateLocationFilter(originalRows);
+                renderTable();
+            })
+            .catch(error => {
+                console.error("Greška pri dohvaćanju CSV-a:", error);
+            });
+      
+        // Popuni select za lokaciju jedinstvenim vrijednostima iz CSV-a
+        function populateLocationFilter(rows) {
+            const uniqueLocations = [...new Set(rows.map(row => row["Location"]).filter(loc => loc))];
+            uniqueLocations.sort();
+      
+            uniqueLocations.forEach(location => {
+                const option = document.createElement("option");
+                option.value = location;
+                option.textContent = location.charAt(0).toUpperCase() + location.slice(1);
+                locationFilter.appendChild(option);
+            });
+        }
+      
+        // Funkcija za prikaz filtrirane tablice
+        function renderTable() {
+            const season = seasonFilter.value;
+            const locationValue = locationFilter.value;
+            const minTemp = parseFloat(tempRange.value);
+      
+            const filteredRows = originalRows.filter(row => {
+                const matchesSeason = season === "" || row["Season"] === season;
+                const matchesLocation = locationValue === "" || row["Location"] === locationValue;
+                const matchesTemp = parseFloat(row["Temperature"]) >= minTemp;
+      
+                return matchesSeason && matchesLocation && matchesTemp;
+            });
+      
+            const container = document.getElementById("csv-table-container");
+            container.innerHTML = "";
+      
+            const table = document.createElement("table");
+            table.classList.add("weather-table");
+      
+            const thead = document.createElement("thead");
+            const headerRow = document.createElement("tr");
+            headers.forEach(header => {
+                const th = document.createElement("th");
+                th.textContent = header;
+                th.style.border = "1px solid #ccc";
+                th.style.padding = "8px";
+                headerRow.appendChild(th);
+            });
+            const thAction = document.createElement("th");
+            thAction.textContent = "Akcija";
+            thAction.style.border = "1px solid #ccc";
+            thAction.style.padding = "8px";
+            headerRow.appendChild(thAction);
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+      
+            const tbody = document.createElement("tbody");
+            filteredRows.forEach(row => {
+                const tr = document.createElement("tr");
+                headers.forEach(header => {
+                    const td = document.createElement("td");
+                    td.textContent = row[header];
+                    td.style.border = "1px solid #ccc";
+                    td.style.padding = "8px";
+                    tr.appendChild(td);
+                });
+      
+                // Dodaj gumb za dodavanje u košaricu
+                const tdAction = document.createElement("td");
+                const addButton = document.createElement("button");
+                addButton.textContent = "Dodaj u košaricu";
+                addButton.classList.add("add-to-basket");
+                addButton.onclick = () => addToBasket(row);
+                tdAction.appendChild(addButton);
+                tr.appendChild(tdAction);
+      
+                tbody.appendChild(tr);
+            });
+      
+            table.appendChild(tbody);
+            container.appendChild(table);
+        }
+      
+        // Dodavanje elementa u košaricu
+        function addToBasket(item) {
+            basket.push(item);
+            renderBasket();
+        }
+      
+        // Funkcija za renderiranje košarice
+        function renderBasket() {         
+            if (basket.length > 0) {
+                basketSection.style.display = "block";
+            }
+      
+            basketTable.innerHTML = "";           
+            const headerRow = document.createElement("tr");
+            headerRow.innerHTML = `
+                <th>Lokacija</th>
+                <th>Temperature</th>
+                <th>Sezona</th>
+                <th>Vrsta vremena</th>
+                <th>Akcija</th>
+            `;
+            basketTable.appendChild(headerRow);
+      
+            basket.forEach((item, index) => {
+                const row = document.createElement("tr");
+                row.innerHTML = `
+                    <td>${item["Location"]}</td>
+                    <td>${item["Temperature"]}</td>
+                    <td>${item["Season"]}</td>
+                    <td>${item["Weather Type"]}</td>
+                    <td>
+                        <button onclick="removeFromBasket(${index})">Ukloni</button>
+                    </td>
+                `;
+                basketTable.appendChild(row);
+            });
+            basketTotal.textContent = `Košarica ima ${basket.length} elementa.`;
+        }      
+        // Uklanjanje elementa iz košarice
+        window.removeFromBasket = function(index) {
+            basket.splice(index, 1);  // Ukloni iz niza
+            renderBasket();  // Ažuriraj prikaz košarice
+        }
+      
+        // Potvrda svih elemenata u košarici
+        window.confirmAllItems = function() {
+            if (basket.length === 0) {
+                alert("Košarica je prazna.");
+                return;
+            }
+    
+            basket.forEach((item, index) => {
+                alert(`Potvrdili ste vremensku priliku na lokaciji: ${item["Location"]} za temperaturu: ${item["Temperature"]}°C.`);
+            });
+    
+            basket = [];
+            renderBasket();
+        }
+    });    
+  </script>      
+</body>
+</html>
